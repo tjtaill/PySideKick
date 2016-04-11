@@ -1,0 +1,11 @@
+<component name="libraryTable">
+  <library name="SideKick">
+    <CLASSES>
+      <root url="jar://$PROJECT_DIR$/SideKick.jar!/" />
+    </CLASSES>
+    <JAVADOC>
+      <root url="jar://$PROJECT_DIR$/SideKick.jar!/javadoc" />
+    </JAVADOC>
+    <SOURCES />
+  </library>
+</component>

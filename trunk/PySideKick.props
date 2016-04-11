@@ -1,0 +1,21 @@
+plugin.pysidekick.PySideKick.activate=defer
+plugin.pysidekick.PySideKick.author=troy
+plugin.pysidekick.PySideKick.description=JeditPlugin To Provide Autocomplete for Python 3
+plugin.pysidekick.PySideKick.docs=docs/PySideKick.html
+plugin.pysidekick.PySideKick.longdescription=description.html
+plugin.pysidekick.PySideKick.name=PySideKick
+plugin.pysidekick.PySideKick.usePluginHome=true
+
+plugin.pysidekick.PySideKick.version=0.1
+
+plugin.pysidekick.PySideKick.depend.0=jdk 1.7.0
+plugin.pysidekick.PySideKick.depend.1=jedit 05.00.99.00
+
+# list addition jedit plugin deps
+plugin.pysidekick.PySideKick.depend.2=plugin errorlist.ErrorListPlugin 2.1
+plugin.pysidekick.PySideKick.depend.3=plugin sidekick.SideKickPlugin 1.7
+plugin.pysidekick.PySideKick.depend.4=plugin antlr.AntlrPlugin 4.4
+
+# list needed jar dependencies
+#plugin.pysidekick.PySideKick.jars=\
+#    bcel-5.2.jar \
