@@ -8,11 +8,14 @@ import sidekick.enhanced.SourceAsset;
 
 import javax.swing.text.Position;
 import javax.swing.tree.DefaultMutableTreeNode;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 public class PySideKickListener extends Python3BaseListener {
     private PySideKickParsedData data;
     private Buffer buffer;
+    private SourceAsset lastFunction;
 
     public PySideKickListener(PySideKickParsedData data, Buffer buffer) {
         this.data = data;
@@ -67,18 +70,43 @@ public class PySideKickListener extends Python3BaseListener {
     public void enterFuncdef(@NotNull Python3Parser.FuncdefContext ctx) {
         int line = ctx.getStart().getLine() - 1;
         String functionName = ctx.NAME().getText();
+        String parameters = ctx.parameters().getText();
         if (data.functions == null) {
             SourceAsset functions = new SourceAsset("functions", line, begin(line, buffer) );
-
             data.functions = new DefaultMutableTreeNode(functions);
             data.root.add( data.functions );
         }
-        SourceAsset function = new SourceAsset(functionName, line, begin(line, buffer));
-        data.functions.add(new DefaultMutableTreeNode(function));
+        String signature = functionName +  parameters;
+        lastFunction = new SourceAsset(signature, line, begin(line, buffer));
+        data.functions.add(new DefaultMutableTreeNode(lastFunction));
+    }
+
+    @Override
+    public void enterReturn_stmt(@NotNull Python3Parser.Return_stmtContext ctx) {
+        int line = ctx.getStart().getLine() - 1;
+        String text = ctx.testlist().getText();
+        System.out.println(text);
     }
 
     @Override
     public void enterExpr_stmt(@NotNull Python3Parser.Expr_stmtContext ctx) {
-        ctx.getText();
+        int line = ctx.getStart().getLine() - 1;
+        String text = ctx.getText();
+        Python3Parser.AugassignContext augassign = ctx.augassign();
+        // we want assignment
+
+        Pattern assignmentPattern = Pattern.compile("([^!=]+)=([^=]+)");
+        Matcher matcher = assignmentPattern.matcher(text);
+        if ( matcher.matches() ) {
+            String assignTo = matcher.group(1);
+            String assignFrom = matcher.group(2);
+            if (data.variables == null) {
+                SourceAsset variables = new SourceAsset("variables", line, begin(line, buffer) );
+                data.variables = new DefaultMutableTreeNode(variables);
+                data.root.add( data.variables );
+            }
+            SourceAsset variableAsset = new SourceAsset(assignTo, line, begin(line, buffer));
+            data.variables.add( new DefaultMutableTreeNode(variableAsset));
+        }
     }
 }
