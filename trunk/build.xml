@@ -21,7 +21,7 @@
     <!-- jEdit installation properties. -->
     <!-- mark:properties -->
     <property name="build.support" value=".."/>
-    <property name="install.dir" value="C:\Users\troy\AppData\Roaming\jEdit\jars"/>
+    <property name="install.dir" value="C:\Users\ttaillefer\AppData\Roaming\jEdit\jars"/>
     <property name="jedit.install.dir" value="C:\Program Files\jEdit"/>
     <property name="jedit.plugins.dir" value="${install.dir}"/>
     <!-- /mark:properties -->
@@ -45,6 +45,8 @@
         <pathelement location="${build.support}/ErrorList.jar"/>
         <pathelement location="${build.support}/SideKick.jar"/>
         <pathelement location="${build.support}/antlr-4.4-complete.jar"/>
+
+        <pathelement location="${lib.dir}/jep-3.5.1.jar"/>
     </path>
 
 </project>

@@ -1,5 +1,8 @@
 package pysidekick;
 
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.ParserRuleContext;
+import org.antlr.v4.runtime.misc.Interval;
 import org.antlr.v4.runtime.misc.NotNull;
 import org.gjt.sp.jedit.Buffer;
 import pyparser.Python3BaseListener;
@@ -16,6 +19,7 @@ public class PySideKickListener extends Python3BaseListener {
     private PySideKickParsedData data;
     private Buffer buffer;
     private SourceAsset lastFunction;
+    private int bufferIntervalStart;
 
     public PySideKickListener(PySideKickParsedData data, Buffer buffer) {
         this.data = data;
@@ -66,11 +70,25 @@ public class PySideKickListener extends Python3BaseListener {
         data.classes.add(new DefaultMutableTreeNode(type));
     }
 
+    private String getRawText(ParserRuleContext ctx) {
+        int start = ctx.start.getStartIndex();
+        return getRawText(start, ctx);
+    }
+
+    private String getRawText(int start, ParserRuleContext ctx) {
+        CharStream input = ctx.start.getInputStream();
+        int stop = ctx.stop.getStopIndex();
+        Interval interval = new Interval(start, stop);
+        return input.getText(interval);
+    }
+
+
     @Override
     public void enterFuncdef(@NotNull Python3Parser.FuncdefContext ctx) {
         int line = ctx.getStart().getLine() - 1;
         String functionName = ctx.NAME().getText();
         String parameters = ctx.parameters().getText();
+        String text = getRawText(bufferIntervalStart, ctx);
         if (data.functions == null) {
             SourceAsset functions = new SourceAsset("functions", line, begin(line, buffer) );
             data.functions = new DefaultMutableTreeNode(functions);
@@ -108,5 +126,10 @@ public class PySideKickListener extends Python3BaseListener {
             SourceAsset variableAsset = new SourceAsset(assignTo, line, begin(line, buffer));
             data.variables.add( new DefaultMutableTreeNode(variableAsset));
         }
+    }
+
+    @Override
+    public void enterFile_input(@NotNull Python3Parser.File_inputContext ctx) {
+        bufferIntervalStart = ctx.start.getStartIndex();
     }
 }

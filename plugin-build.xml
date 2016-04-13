@@ -196,6 +196,8 @@
         <pathelement location="${junit.jar}" />
         <fileset dir="${build.dir}">
             <include name="lib/*.jar"/>
+            <include name="lib/*.dll"/>
+            <include name="lib/*.so"/>
         </fileset>
     </path>
 

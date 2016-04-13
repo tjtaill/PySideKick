@@ -17,5 +17,5 @@ plugin.pysidekick.PySideKick.depend.3=plugin sidekick.SideKickPlugin 1.7
 plugin.pysidekick.PySideKick.depend.4=plugin antlr.AntlrPlugin 4.4
 
 # list needed jar dependencies
-#plugin.pysidekick.PySideKick.jars=\
-#    bcel-5.2.jar \
+plugin.pysidekick.PySideKick.jars=\
+    jep-3.5.1.jar
