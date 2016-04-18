@@ -19,7 +19,11 @@ public class PySideKickListener extends Python3BaseListener {
     private PySideKickParsedData data;
     private Buffer buffer;
     private SourceAsset lastFunction;
+    DefaultMutableTreeNode lastClass;
     private int bufferIntervalStart;
+    Python3Parser.ClassdefContext classCtx;
+    private Python3Parser.FuncdefContext funcCtx;
+
 
     public PySideKickListener(PySideKickParsedData data, Buffer buffer) {
         this.data = data;
@@ -59,6 +63,7 @@ public class PySideKickListener extends Python3BaseListener {
 
     @Override
     public void enterClassdef(@NotNull Python3Parser.ClassdefContext ctx) {
+        classCtx = ctx;
         int line = ctx.getStart().getLine() - 1;
         String className = ctx.NAME().getText();
         if (data.classes == null) {
@@ -67,8 +72,11 @@ public class PySideKickListener extends Python3BaseListener {
             data.root.add( data.classes );
         }
         SourceAsset type = new SourceAsset(className, line, begin(line, buffer));
-        data.classes.add(new DefaultMutableTreeNode(type));
+        lastClass = new DefaultMutableTreeNode(type);
+        data.classes.add(lastClass);
     }
+
+
 
     private String getRawText(ParserRuleContext ctx) {
         int start = ctx.start.getStartIndex();
@@ -85,24 +93,54 @@ public class PySideKickListener extends Python3BaseListener {
 
     @Override
     public void enterFuncdef(@NotNull Python3Parser.FuncdefContext ctx) {
+        funcCtx = ctx;
         int line = ctx.getStart().getLine() - 1;
         String functionName = ctx.NAME().getText();
         String parameters = ctx.parameters().getText();
-        String text = getRawText(bufferIntervalStart, ctx);
-        if (data.functions == null) {
-            SourceAsset functions = new SourceAsset("functions", line, begin(line, buffer) );
-            data.functions = new DefaultMutableTreeNode(functions);
-            data.root.add( data.functions );
+        ParserRuleContext endCtx = classCtx == null ? ctx : classCtx;
+        String text = getRawText(bufferIntervalStart, endCtx);
+        DefaultMutableTreeNode functionNode = null;
+        if ( classCtx == null ) {
+            if (data.functions == null) {
+                SourceAsset functionAsset = new SourceAsset("functions", line, begin(line, buffer));
+                data.functions = new DefaultMutableTreeNode(functionAsset);
+                data.root.add(data.functions);
+                functionNode = data.functions;
+            }
+
+            data.functions.add(new DefaultMutableTreeNode(lastFunction));
+        } else {
+            functionNode = getClassFunctions(lastClass, line);
         }
         String signature = functionName +  parameters;
         lastFunction = new SourceAsset(signature, line, begin(line, buffer));
-        data.functions.add(new DefaultMutableTreeNode(lastFunction));
+        functionNode.add( new DefaultMutableTreeNode(lastFunction) );
+    }
+
+    private DefaultMutableTreeNode getClassFunctions(DefaultMutableTreeNode classNode, int line) {
+        DefaultMutableTreeNode functions = null;
+        for(int i = 0; i < classNode.getChildCount(); i++) {
+            DefaultMutableTreeNode child = (DefaultMutableTreeNode) classNode.getChildAt(i);
+            SourceAsset sa = (SourceAsset) child.getUserObject();
+            if ( sa.getName().equals("functions") ) {
+                functions = child;
+                break;
+            }
+        }
+        if ( functions == null ) {
+            functions = new DefaultMutableTreeNode( new SourceAsset("functions", line, begin(line, buffer)) );
+            classNode.add( functions );
+        }
+
+        return functions;
     }
 
     @Override
     public void enterReturn_stmt(@NotNull Python3Parser.Return_stmtContext ctx) {
         int line = ctx.getStart().getLine() - 1;
+
         String text = ctx.testlist().getText();
+
         System.out.println(text);
     }
 
@@ -110,6 +148,7 @@ public class PySideKickListener extends Python3BaseListener {
     public void enterExpr_stmt(@NotNull Python3Parser.Expr_stmtContext ctx) {
         int line = ctx.getStart().getLine() - 1;
         String text = ctx.getText();
+        // TODO deal with augmented assignment operators too
         Python3Parser.AugassignContext augassign = ctx.augassign();
         // we want assignment
 
@@ -118,14 +157,34 @@ public class PySideKickListener extends Python3BaseListener {
         if ( matcher.matches() ) {
             String assignTo = matcher.group(1);
             String assignFrom = matcher.group(2);
-            if (data.variables == null) {
-                SourceAsset variables = new SourceAsset("variables", line, begin(line, buffer) );
-                data.variables = new DefaultMutableTreeNode(variables);
-                data.root.add( data.variables );
+            if (funcCtx != null && classCtx != null) {
+
+            } else if (funcCtx != null ) {
+
+
+            }  else {
+                if (data.variables == null) {
+                    SourceAsset variables = new SourceAsset("variables", line, begin(line, buffer));
+                    data.variables = new DefaultMutableTreeNode(variables);
+                    data.root.add(data.variables);
+                }
+                SourceAsset variableAsset = new SourceAsset(assignTo, line, begin(line, buffer));
+                data.variables.add(new DefaultMutableTreeNode(variableAsset));
             }
-            SourceAsset variableAsset = new SourceAsset(assignTo, line, begin(line, buffer));
-            data.variables.add( new DefaultMutableTreeNode(variableAsset));
         }
+    }
+
+    @Override
+    public void exitClassdef(@NotNull Python3Parser.ClassdefContext ctx) {
+        classCtx = null;
+        lastClass = null;
+    }
+
+    @Override
+    public void exitFuncdef(@NotNull Python3Parser.FuncdefContext ctx) {
+        funcCtx = null;
+        lastFunction = null;
+
     }
 
     @Override
