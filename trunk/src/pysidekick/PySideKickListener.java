@@ -1,5 +1,6 @@
 package pysidekick;
 
+import jep.JepException;
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.misc.Interval;
@@ -18,7 +19,8 @@ import java.util.regex.Pattern;
 public class PySideKickListener extends Python3BaseListener {
     private PySideKickParsedData data;
     private Buffer buffer;
-    private SourceAsset lastFunction;
+    private SourceAsset lastFunctionAsset;
+    private DefaultMutableTreeNode lastFunctionNode;
     DefaultMutableTreeNode lastClass;
     private int bufferIntervalStart;
     Python3Parser.ClassdefContext classCtx;
@@ -108,13 +110,13 @@ public class PySideKickListener extends Python3BaseListener {
                 functionNode = data.functions;
             }
 
-            data.functions.add(new DefaultMutableTreeNode(lastFunction));
+            data.functions.add(new DefaultMutableTreeNode(lastFunctionAsset));
         } else {
             functionNode = getClassFunctions(lastClass, line);
         }
-        String signature = functionName +  parameters;
-        lastFunction = new SourceAsset(signature, line, begin(line, buffer));
-        functionNode.add( new DefaultMutableTreeNode(lastFunction) );
+        String signature = functionName +  parameters + " : None";
+        lastFunctionAsset = new SourceAsset(signature, line, begin(line, buffer));
+        functionNode.add( new DefaultMutableTreeNode(lastFunctionAsset) );
     }
 
     private DefaultMutableTreeNode getClassFunctions(DefaultMutableTreeNode classNode, int line) {
@@ -133,6 +135,24 @@ public class PySideKickListener extends Python3BaseListener {
         }
 
         return functions;
+    }
+
+    private DefaultMutableTreeNode getVariablesNode(DefaultMutableTreeNode node, int line) {
+        DefaultMutableTreeNode variables = null;
+        for(int i = 0; i < node.getChildCount(); i++) {
+            DefaultMutableTreeNode child = (DefaultMutableTreeNode) node.getChildAt(i);
+            SourceAsset sa = (SourceAsset) child.getUserObject();
+            if ( sa.getName().equals("variables") ) {
+                variables = child;
+                break;
+            }
+        }
+        if ( variables == null ) {
+            variables = new DefaultMutableTreeNode( new SourceAsset("variables", line, begin(line, buffer)) );
+            node.add(variables);
+        }
+
+        return variables;
     }
 
     @Override
@@ -155,22 +175,39 @@ public class PySideKickListener extends Python3BaseListener {
         Pattern assignmentPattern = Pattern.compile("([^!=]+)=([^=]+)");
         Matcher matcher = assignmentPattern.matcher(text);
         if ( matcher.matches() ) {
-            String assignTo = matcher.group(1);
+            final String assignTo = matcher.group(1);
             String assignFrom = matcher.group(2);
+            DefaultMutableTreeNode variablesNode = null;
+            final StringBuffer type = new StringBuffer();
+            type.append(" : None");
+            String pythonBlock = "";
             if (funcCtx != null && classCtx != null) {
-
-            } else if (funcCtx != null ) {
-
-
+                if ( assignTo.startsWith("self.") ) {
+                    variablesNode = getVariablesNode(lastClass, line);
+                } else {
+                    variablesNode = getVariablesNode(lastFunctionNode, line);
+                }
+            } else if (funcCtx != null) {
+                variablesNode = getVariablesNode(lastFunctionNode, line);
             }  else {
                 if (data.variables == null) {
                     SourceAsset variables = new SourceAsset("variables", line, begin(line, buffer));
                     data.variables = new DefaultMutableTreeNode(variables);
                     data.root.add(data.variables);
                 }
-                SourceAsset variableAsset = new SourceAsset(assignTo, line, begin(line, buffer));
-                data.variables.add(new DefaultMutableTreeNode(variableAsset));
+                variablesNode = data.variables;
+                pythonBlock = getRawText(bufferIntervalStart, ctx);
             }
+            try {
+                PyEvaluator.JepEval jepEval = PyEvaluator.addBlock(pythonBlock);
+                type.delete(0, type.length());
+                type.append(" : " + PyEvaluator.varType(jepEval, assignTo));
+                jepEval.jep.close();
+            } catch (JepException e) {
+                e.printStackTrace();
+            }
+            SourceAsset variableAsset = new SourceAsset(assignTo + type.toString(), line, begin(line, buffer));
+            variablesNode.add(new DefaultMutableTreeNode(variableAsset));
         }
     }
 
@@ -183,7 +220,7 @@ public class PySideKickListener extends Python3BaseListener {
     @Override
     public void exitFuncdef(@NotNull Python3Parser.FuncdefContext ctx) {
         funcCtx = null;
-        lastFunction = null;
+        lastFunctionAsset = null;
 
     }
 
