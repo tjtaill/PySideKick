@@ -6,16 +6,18 @@ import jep.JepException;
 
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class PyEvaluator {
+
     static class JepEval {
         public final Jep jep;
-        public final int identation;
+        public final int indentation;
 
-        JepEval(Jep jep, int identation) {
+        JepEval(Jep jep, int indentation) {
             this.jep = jep;
-            this.identation = identation;
+            this.indentation = indentation;
         }
     }
 
@@ -29,6 +31,35 @@ public class PyEvaluator {
                 break;
         }
         return ident;
+    }
+
+    public static String expressionVarType(Set<String> importStatements, String expression) {
+        String type = "None";
+        try (Jep jep = new Jep(true, "C:\\Python34\\Scripts");) {
+            for (String importStatement : importStatements ) {
+                jep.eval(importStatement);
+            }
+            jep.eval("temp_type = type(" + expression + ")");
+            jep.eval("temp_module = temp_type.__module__ if temp_type else None");
+            jep.eval("temp_name = temp_type.__name__ if temp_type else None");
+
+            String module = (String) jep.getValue("temp_module");
+            String name = (String) jep.getValue("temp_name");
+            if ( "None".equals(name) ) {
+                type = (String) jep.getValue("temp_type");
+            } else if ("None".equals(module) ) {
+                type = name;
+            } else {
+                if ( "builtins".equals(module) ) {
+                    type = name;
+                } else {
+                    type = module + "." + name;
+                }
+            }
+        } catch (JepException e) {
+            e.printStackTrace();
+        }
+        return type;
     }
 
     public static JepEval addBlock(String pythonBlock) throws JepException {
@@ -64,6 +95,17 @@ public class PyEvaluator {
         return types;
     }
 
+    public static List<String> namespaceNames(Set<String> importStatements, String namespace ) {
+        try ( Jep jep = new Jep(true, "C:\\Python34\\Scripts"); ){
+            for (String importStatement : importStatements ) {
+                jep.eval(importStatement);
+            }
+        } catch (JepException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
 
 
     public static Set<String> builtinModules() throws JepException {
@@ -83,17 +125,37 @@ public class PyEvaluator {
         return names;
     }
 
-    public static String varType(JepEval jepEval, String variableName) throws JepException {
-        StringBuilder ps = new StringBuilder();
-        for(int i = 0; i < jepEval.identation; i++) {
-            ps.append(' ');
+    private static void indent(StringBuilder builder, int indentation) {
+        for(int i = 0; i < indentation; i++) {
+            builder.append(' ');
         }
+    }
+
+    public static String moduleLevelVarType(JepEval jepEval, String variableName) throws JepException {
+        StringBuilder ps = new StringBuilder();
+        indent(ps, jepEval.indentation);
         ps.append("temp_type = type(" + variableName + ")");
         String type = "None";
+        Jep jep = jepEval.jep;
         try {
-            jepEval.jep.eval(ps.toString());
-            jepEval.jep.eval(null);
-            type = (String) jepEval.jep.getValue("temp_type");
+            jep.eval(ps.toString());
+            jep.eval(null);
+            jep.eval("temp_module = temp_type.__module__ if temp_type else None");
+            jep.eval("temp_name = temp_type.__name__ if temp_type else None");
+            String module = (String) jep.getValue("temp_module");
+            String name = (String) jep.getValue("temp_name");
+            if ( "None".equals(name) ) {
+                type = (String) jep.getValue("temp_type");
+            } else if ("None".equals(module) ) {
+                type = name;
+            } else {
+                if ( "builtins".equals(module) ) {
+                    type = name;
+                } else {
+                    type = module + "." + name;
+                }
+            }
+            jep.close();
         } catch (JepException e) {
             e.printStackTrace();
         }

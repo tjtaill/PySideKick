@@ -12,6 +12,9 @@ import sidekick.enhanced.SourceAsset;
 
 import javax.swing.text.Position;
 import javax.swing.tree.DefaultMutableTreeNode;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -21,11 +24,24 @@ public class PySideKickListener extends Python3BaseListener {
     private Buffer buffer;
     private SourceAsset lastFunctionAsset;
     private DefaultMutableTreeNode lastFunctionNode;
-    DefaultMutableTreeNode lastClass;
+    private DefaultMutableTreeNode lastClass;
     private int bufferIntervalStart;
-    Python3Parser.ClassdefContext classCtx;
+    private Python3Parser.ClassdefContext classCtx;
     private Python3Parser.FuncdefContext funcCtx;
+    private Set<String> importStatements = new HashSet<>();
 
+    private static class PyImportAsset extends SourceAsset {
+        private final String importStatement;
+
+        public PyImportAsset(String name, int lineNo, Position start, String importStatment) {
+            super(name, lineNo, start);
+            this.importStatement = importStatment;
+        }
+
+        public String getImportStatement() {
+            return importStatement;
+        }
+    }
 
     public PySideKickListener(PySideKickParsedData data, Buffer buffer) {
         this.data = data;
@@ -38,29 +54,47 @@ public class PySideKickListener extends Python3BaseListener {
 
     @Override
     public void enterImport_from(@NotNull Python3Parser.Import_fromContext ctx) {
+        importStatements.add( getRawText(ctx) );
+        /*
+        // TODO: Not an import but should add the import symbols into the lookup tables
         int line = ctx.getStart().getLine() - 1;
-        String importNames = ctx.dotted_name().getText();
+        String importName = ctx.dotted_name().getText();
         if ( data.imports == null ) {
             SourceAsset imports = new SourceAsset("imports", line, begin(line, buffer) );
             data.imports = new DefaultMutableTreeNode(imports);
             data.root.add(data.imports);
         }
-        SourceAsset imp = new SourceAsset(importNames, line, begin(line, buffer));
+        SourceAsset imp = new SourceAsset(importName, line, begin(line, buffer));
         data.imports.add(new DefaultMutableTreeNode(imp));
-
+        */
     }
+
+
 
     @Override
     public void enterImport_name(@NotNull Python3Parser.Import_nameContext ctx) {
+        importStatements.add( getRawText(ctx) );
         int line = ctx.getStart().getLine() - 1;
-        String importNames = ctx.dotted_as_names().getText();
-        if ( data.imports == null ) {
-            SourceAsset imports = new SourceAsset("imports", line, begin(line, buffer) );
-            data.imports = new DefaultMutableTreeNode(imports);
-            data.root.add(data.imports);
+
+        List<Python3Parser.Dotted_as_nameContext> danCtxs = ctx.dotted_as_names().dotted_as_name();
+        for (Python3Parser.Dotted_as_nameContext danCtx : danCtxs) {
+            String importName = danCtx.dotted_name().getText();
+            DefaultMutableTreeNode importNode = null;
+            if (funcCtx == null && classCtx != null) {
+                importNode = getChildNode(lastClass, "imports", line);
+            } else if (funcCtx != null) {
+                importNode = getChildNode(lastFunctionNode, "imports", line);
+            }  else {
+                if (data.imports == null) {
+                    SourceAsset imports = new SourceAsset("imports", line, begin(line, buffer));
+                    data.imports = new DefaultMutableTreeNode(imports);
+                    data.root.add(data.imports);
+                }
+                importNode = data.imports;
+            }
+            SourceAsset imp = new SourceAsset(importName, line, begin(line, buffer));
+            importNode.add( new DefaultMutableTreeNode(imp) );
         }
-        SourceAsset imp = new SourceAsset(importNames, line, begin(line, buffer));
-        data.imports.add( new DefaultMutableTreeNode(imp) );
     }
 
     @Override
@@ -80,16 +114,20 @@ public class PySideKickListener extends Python3BaseListener {
 
 
 
+    private String getRawText(ParserRuleContext ctx, int start, int end) {
+        CharStream input = ctx.start.getInputStream();
+        Interval interval = new Interval(start, end);
+        return input.getText(interval);
+    }
+
     private String getRawText(ParserRuleContext ctx) {
         int start = ctx.start.getStartIndex();
         return getRawText(start, ctx);
     }
 
     private String getRawText(int start, ParserRuleContext ctx) {
-        CharStream input = ctx.start.getInputStream();
         int stop = ctx.stop.getStopIndex();
-        Interval interval = new Interval(start, stop);
-        return input.getText(interval);
+        return getRawText(ctx, start, stop);
     }
 
 
@@ -110,49 +148,41 @@ public class PySideKickListener extends Python3BaseListener {
                 functionNode = data.functions;
             }
 
-            data.functions.add(new DefaultMutableTreeNode(lastFunctionAsset));
+            functionNode = data.functions;
         } else {
             functionNode = getClassFunctions(lastClass, line);
         }
         String signature = functionName +  parameters + " : None";
         lastFunctionAsset = new SourceAsset(signature, line, begin(line, buffer));
-        functionNode.add( new DefaultMutableTreeNode(lastFunctionAsset) );
+        lastFunctionNode = new DefaultMutableTreeNode(lastFunctionAsset);
+        functionNode.add( lastFunctionNode );
     }
 
-    private DefaultMutableTreeNode getClassFunctions(DefaultMutableTreeNode classNode, int line) {
-        DefaultMutableTreeNode functions = null;
-        for(int i = 0; i < classNode.getChildCount(); i++) {
-            DefaultMutableTreeNode child = (DefaultMutableTreeNode) classNode.getChildAt(i);
+    private DefaultMutableTreeNode getChildNode(DefaultMutableTreeNode parent, String childName, int line) {
+        DefaultMutableTreeNode child = null;
+        for(int i = 0; i < parent.getChildCount(); i++) {
+            child = (DefaultMutableTreeNode) parent.getChildAt(i);
             SourceAsset sa = (SourceAsset) child.getUserObject();
-            if ( sa.getName().equals("functions") ) {
-                functions = child;
+            if ( sa.getName().equals(childName) ) {
                 break;
+            } else {
+                child = null;
             }
         }
-        if ( functions == null ) {
-            functions = new DefaultMutableTreeNode( new SourceAsset("functions", line, begin(line, buffer)) );
-            classNode.add( functions );
+        if ( child == null ) {
+            child = new DefaultMutableTreeNode( new SourceAsset(childName, line, begin(line, buffer)) );
+            parent.add( child );
         }
 
-        return functions;
+        return child;
+    }
+
+    private DefaultMutableTreeNode getClassFunctions(DefaultMutableTreeNode functionNode, int line) {
+        return getChildNode(functionNode, "functions", line);
     }
 
     private DefaultMutableTreeNode getVariablesNode(DefaultMutableTreeNode node, int line) {
-        DefaultMutableTreeNode variables = null;
-        for(int i = 0; i < node.getChildCount(); i++) {
-            DefaultMutableTreeNode child = (DefaultMutableTreeNode) node.getChildAt(i);
-            SourceAsset sa = (SourceAsset) child.getUserObject();
-            if ( sa.getName().equals("variables") ) {
-                variables = child;
-                break;
-            }
-        }
-        if ( variables == null ) {
-            variables = new DefaultMutableTreeNode( new SourceAsset("variables", line, begin(line, buffer)) );
-            node.add(variables);
-        }
-
-        return variables;
+        return getChildNode(node, "variables", line);
     }
 
     @Override
@@ -172,7 +202,7 @@ public class PySideKickListener extends Python3BaseListener {
         Python3Parser.AugassignContext augassign = ctx.augassign();
         // we want assignment
 
-        Pattern assignmentPattern = Pattern.compile("([^!=]+)=([^=]+)");
+        Pattern assignmentPattern = Pattern.compile("([^(!=]+)=([^=]+)");
         Matcher matcher = assignmentPattern.matcher(text);
         if ( matcher.matches() ) {
             final String assignTo = matcher.group(1);
@@ -184,11 +214,17 @@ public class PySideKickListener extends Python3BaseListener {
             if (funcCtx != null && classCtx != null) {
                 if ( assignTo.startsWith("self.") ) {
                     variablesNode = getVariablesNode(lastClass, line);
+                    type.delete(0, type.length());
+                    type.append(" : " + PyEvaluator.expressionVarType(importStatements, assignFrom));
                 } else {
                     variablesNode = getVariablesNode(lastFunctionNode, line);
+                    type.delete(0, type.length());
+                    type.append( " : " + PyEvaluator.expressionVarType(importStatements, assignFrom) );
                 }
             } else if (funcCtx != null) {
                 variablesNode = getVariablesNode(lastFunctionNode, line);
+                type.delete(0, type.length());
+                type.append( " : " + PyEvaluator.expressionVarType(importStatements, assignFrom) );
             }  else {
                 if (data.variables == null) {
                     SourceAsset variables = new SourceAsset("variables", line, begin(line, buffer));
@@ -197,15 +233,21 @@ public class PySideKickListener extends Python3BaseListener {
                 }
                 variablesNode = data.variables;
                 pythonBlock = getRawText(bufferIntervalStart, ctx);
+                try {
+                    PyEvaluator.JepEval jepEval = PyEvaluator.addBlock(pythonBlock);
+
+                    String kind = PyEvaluator.moduleLevelVarType(jepEval, assignTo);
+                    if ( "None".equals(kind) ) {
+                        kind = PyEvaluator.expressionVarType(importStatements, assignFrom);
+                    }
+                    type.delete(0, type.length());
+                    type.append(" : " + kind );
+                    jepEval.jep.close();
+                } catch (JepException e) {
+                    e.printStackTrace();
+                }
             }
-            try {
-                PyEvaluator.JepEval jepEval = PyEvaluator.addBlock(pythonBlock);
-                type.delete(0, type.length());
-                type.append(" : " + PyEvaluator.varType(jepEval, assignTo));
-                jepEval.jep.close();
-            } catch (JepException e) {
-                e.printStackTrace();
-            }
+
             SourceAsset variableAsset = new SourceAsset(assignTo + type.toString(), line, begin(line, buffer));
             variablesNode.add(new DefaultMutableTreeNode(variableAsset));
         }
@@ -221,6 +263,7 @@ public class PySideKickListener extends Python3BaseListener {
     public void exitFuncdef(@NotNull Python3Parser.FuncdefContext ctx) {
         funcCtx = null;
         lastFunctionAsset = null;
+        lastFunctionNode = null;
 
     }
 
