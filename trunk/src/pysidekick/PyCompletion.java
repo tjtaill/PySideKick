@@ -23,7 +23,6 @@ public class PyCompletion extends SideKickCompletion {
     @Override
     public boolean handleKeystroke(int selectedIndex, char keyChar)
     {
-        // if(keyChar == '\t' || keyChar == '\n')
         if(SideKickActions.acceptChars.indexOf(keyChar) > -1)
         {
             insert(selectedIndex);

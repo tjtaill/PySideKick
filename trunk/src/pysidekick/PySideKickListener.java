@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 
 
 public class PySideKickListener extends Python3BaseListener {
+    private PyCompletionBuilder completionBuilder;
     private PySideKickParsedData data;
     private Buffer buffer;
     private SourceAsset lastFunctionAsset;
@@ -30,22 +31,11 @@ public class PySideKickListener extends Python3BaseListener {
     private Python3Parser.FuncdefContext funcCtx;
     private Set<String> importStatements = new HashSet<>();
 
-    private static class PyImportAsset extends SourceAsset {
-        private final String importStatement;
 
-        public PyImportAsset(String name, int lineNo, Position start, String importStatment) {
-            super(name, lineNo, start);
-            this.importStatement = importStatment;
-        }
-
-        public String getImportStatement() {
-            return importStatement;
-        }
-    }
-
-    public PySideKickListener(PySideKickParsedData data, Buffer buffer) {
+    public PySideKickListener(PySideKickParsedData data, Buffer buffer, PyCompletionBuilder completionBuilder) {
         this.data = data;
         this.buffer = buffer;
+        this.completionBuilder = completionBuilder;
     }
 
     private Position begin(int line, Buffer buffer) {
@@ -92,6 +82,7 @@ public class PySideKickListener extends Python3BaseListener {
                 }
                 importNode = data.imports;
             }
+            completionBuilder.addModule(importName);
             SourceAsset imp = new SourceAsset(importName, line, begin(line, buffer));
             importNode.add( new DefaultMutableTreeNode(imp) );
         }
@@ -247,7 +238,7 @@ public class PySideKickListener extends Python3BaseListener {
                     e.printStackTrace();
                 }
             }
-
+            completionBuilder.addVar(assignTo, type.toString());
             SourceAsset variableAsset = new SourceAsset(assignTo + type.toString(), line, begin(line, buffer));
             variablesNode.add(new DefaultMutableTreeNode(variableAsset));
         }

@@ -7,28 +7,38 @@ public class PyCompletionBuilder {
     public static PyCompletion CURRENT;
     private Map<String, List<String>> typeCompletionCache = new HashMap<>();
     private Map<String, List<String>> namespaceToCompletionsCache = new HashMap<>();
-    private Set<String> importStatements = new HashSet<>();
+    private static List<String> topLevelModules = PyEvaluator.importableModules();
 
 
+    public void addVar(String varName, String type) {
+        List<String> completions = null;
 
+        completions = typeCompletionCache.get(type);
 
-    public void addImportStatement(String importStatement) {
-        importStatements.add(importStatement);
-    }
-
-
-    public void addNamespace(String namespaceName, String type) {
-        List<String> completions = typeCompletionCache.get(type);
-        if (completions == null ) {
-            // TODO : build completions for type and store it
+        if (completions == null) {
+            if ("None".equals(type) ) {
+                completions = Collections.EMPTY_LIST;
+            } else {
+                completions = PyEvaluator.typeNames(type);
+            }
             typeCompletionCache.put(type, completions);
         }
-        namespaceToCompletionsCache.put(namespaceName, completions);
+        namespaceToCompletionsCache.put(varName, completions);
     }
 
-    public List<String> moduleNameCompletion(String modulePrefix) {
-        // TODO : build list of modules based on module prefix
-        return null;
+    public void addModule(String moduleName) {
+        List<String> completions = null;
+
+        completions = namespaceToCompletionsCache.get(moduleName);
+
+        if (completions == null) {
+            completions = PyEvaluator.moduleNames(moduleName);
+        }
+        namespaceToCompletionsCache.put(moduleName, completions);
+    }
+
+    public List<String> moduleCompletion() {
+        return topLevelModules;
     }
 
     public List<String> namespaceCompletion(String namespace) {

@@ -4,10 +4,7 @@ package pysidekick;
 import jep.Jep;
 import jep.JepException;
 
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class PyEvaluator {
 
@@ -35,7 +32,7 @@ public class PyEvaluator {
 
     public static String expressionVarType(Set<String> importStatements, String expression) {
         String type = "None";
-        try (Jep jep = new Jep(true, "C:\\Python34\\Scripts");) {
+        try ( Jep jep = new Jep(true, "C:\\Python34\\Scripts") ) {
             for (String importStatement : importStatements ) {
                 jep.eval(importStatement);
             }
@@ -78,35 +75,40 @@ public class PyEvaluator {
         return new JepEval(jep, ident);
     }
 
-    public static Set<String> builtinNames() throws JepException {
-        Jep jep = new Jep(true, "C:\\Python34\\Scripts");
-        jep.eval("names = dir(__builtins__)");
-        Set<String> names = new HashSet<String>((Collection<? extends String>) jep.getValue("names"));
-        jep.close();
-        return names;
-    }
-
-    public static Set<String> builtinTypes() throws JepException {
-        Jep jep = new Jep(true, "C:\\Python34\\Scripts");
-        jep.eval("names = dir(__builtins__)");
-        jep.eval("types = {for name in names if type == type(eval(name))}");
-        Set<String> types = (Set<String>) jep.getValue("types");
-        jep.close();
-        return types;
-    }
-
-    public static List<String> namespaceNames(Set<String> importStatements, String namespace ) {
-        try ( Jep jep = new Jep(true, "C:\\Python34\\Scripts"); ){
-            for (String importStatement : importStatements ) {
-                jep.eval(importStatement);
+    public static List<String> typeNames(String namespace) {
+        List<String> names = Collections.EMPTY_LIST;
+        try ( Jep jep = new Jep(false, "C:\\Python34\\Scripts") ){
+            int lastDotIndex = namespace.lastIndexOf('.');
+            if ( lastDotIndex > -1 ) {
+                String toImport = namespace.substring(0, lastDotIndex);
+                jep.eval("import " + toImport);
             }
+            jep.eval("temp_names = dir(" + namespace + ")");
+            names = (List<String>) jep.getValue("temp_names");
         } catch (JepException e) {
             e.printStackTrace();
         }
-        return null;
+        Collections.sort(names);
+        return names;
     }
 
-
+    public static List<String> importableModules() {
+        List<String> modules = Collections.EMPTY_LIST;
+        List<String> builtins = Collections.EMPTY_LIST;
+        try (Jep jep = new Jep(false, "C:\\Python34\\Scripts") ) {
+            jep.eval("from pkgutil import iter_modules");
+            jep.eval("import sys");
+            jep.eval("temp_modules = [m[1] for m in iter_modules()]");
+            modules = (List<String>) jep.getValue("temp_modules");
+            jep.eval("bm = sys.builtin_module_names");
+            builtins = (List<String>) jep.getValue("bm");
+            modules.addAll(builtins);
+        } catch(JepException e) {
+            e.printStackTrace();
+        }
+        Collections.sort(modules);
+        return modules;
+    }
 
     public static Set<String> builtinModules() throws JepException {
         Jep jep = new Jep(true, "C:\\Python34\\Scripts");
@@ -117,11 +119,18 @@ public class PyEvaluator {
         return modules;
     }
 
-    public static Set<String> moduleNames(String pythonModule) throws JepException {
-        Jep jep = new Jep(true, "C:\\Python34\\Scripts");
-        jep.eval("names = dir(" + pythonModule + ")");
-        Set<String> names = new HashSet<String>((Collection<? extends String>) jep.getValue("names"));
-        jep.close();
+    public static List<String> moduleNames(String pythonModule) {
+        List<String> names = Collections.EMPTY_LIST;
+        try {
+            Jep jep = new Jep(false, "C:\\Python34\\Scripts");
+            jep.eval("import " + pythonModule);
+            jep.eval("names = dir(" + pythonModule + ")");
+            names = (List<String>) jep.getValue("names");
+            jep.close();
+        } catch (JepException e) {
+            e.printStackTrace();
+        }
+        Collections.sort(names);
         return names;
     }
 
