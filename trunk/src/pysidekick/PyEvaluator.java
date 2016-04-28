@@ -110,15 +110,6 @@ public class PyEvaluator {
         return modules;
     }
 
-    public static Set<String> builtinModules() throws JepException {
-        Jep jep = new Jep(true, "C:\\Python34\\Scripts");
-        jep.eval("import sys");
-        jep.eval("modules = sys.builtin_module_names");
-        Set<String> modules = new HashSet<String>((Collection<? extends String>) jep.getValue("modules"));
-        jep.close();
-        return modules;
-    }
-
     public static List<String> moduleNames(String pythonModule) {
         List<String> names = Collections.EMPTY_LIST;
         try {

@@ -26,7 +26,7 @@ public class PySideKickParser extends SideKickParser {
     private SideKickCompletionPopup lastCompletionPopup;
     private PyCompletion lastCompletion;
     private PyCompletionBuilder completionBuilder = new PyCompletionBuilder();
-    private final static Pattern FROM_IMPORT = Pattern.compile("^\\s*from\\s*?(\\S)+\\s*$");
+    private final static Pattern FROM_IMPORT = Pattern.compile("^\\s*(?:from|import)\\s+(\\S+).*$");
     public PySideKickParser() {
         super("python");
     }
@@ -135,10 +135,9 @@ public class PySideKickParser extends SideKickParser {
         List<String> completions = Collections.EMPTY_LIST;
         if (c == ' ') {
             if ( moduleContext(textArea, caret ) ) {
-
                 completions = completionBuilder.moduleCompletion();
             } else if ( moduleNamesContext(textArea, caret) ) {
-                String module = getModuleAfterFrom(textArea, caret);
+                String module = getModuleAfterKeyword(textArea, caret);
                 if (! module.isEmpty() ) {
                     completionBuilder.addModule(module);
                     completions = completionBuilder.namespaceCompletion(module);
@@ -152,12 +151,12 @@ public class PySideKickParser extends SideKickParser {
         return lastCompletion;
     }
 
-    private String getModuleAfterFrom(JEditTextArea textArea, int caret) {
+    private String getModuleAfterKeyword(JEditTextArea textArea, int caret) {
         int lineNo = textArea.getCaretLine();
         String line = textArea.getLineText( lineNo );
         Matcher matcher = FROM_IMPORT.matcher(line);
         String module = "";
-        if (matcher.matches() ) {
+        if (matcher.matches()) {
             module = matcher.group(1);
         }
         return module;
@@ -170,10 +169,10 @@ public class PySideKickParser extends SideKickParser {
 
 
         int fromIndex = line.lastIndexOf("from");
-        if (fromIndex == -1 || fromIndex < pos) return false;
+        if (fromIndex == -1 || fromIndex > pos) return false;
 
         int importIndex = line.lastIndexOf("import");
-        if (importIndex == -1 || importIndex < fromIndex || importIndex < pos) return false;
+        if (importIndex == -1 || importIndex < fromIndex || importIndex > pos) return false;
 
         // either space after import or space after comma should trigger module names completion
         String beforeSpace = getStringBeforeSpace(textArea, caret);

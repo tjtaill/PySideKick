@@ -202,6 +202,7 @@ public class PySideKickListener extends Python3BaseListener {
             final StringBuffer type = new StringBuffer();
             type.append(" : None");
             String pythonBlock = "";
+            String kind = "None";
             if (funcCtx != null && classCtx != null) {
                 if ( assignTo.startsWith("self.") ) {
                     variablesNode = getVariablesNode(lastClass, line);
@@ -215,7 +216,8 @@ public class PySideKickListener extends Python3BaseListener {
             } else if (funcCtx != null) {
                 variablesNode = getVariablesNode(lastFunctionNode, line);
                 type.delete(0, type.length());
-                type.append( " : " + PyEvaluator.expressionVarType(importStatements, assignFrom) );
+                kind = PyEvaluator.expressionVarType(importStatements, assignFrom);
+                type.append( " : " + kind);
             }  else {
                 if (data.variables == null) {
                     SourceAsset variables = new SourceAsset("variables", line, begin(line, buffer));
@@ -227,7 +229,7 @@ public class PySideKickListener extends Python3BaseListener {
                 try {
                     PyEvaluator.JepEval jepEval = PyEvaluator.addBlock(pythonBlock);
 
-                    String kind = PyEvaluator.moduleLevelVarType(jepEval, assignTo);
+                    kind = PyEvaluator.moduleLevelVarType(jepEval, assignTo);
                     if ( "None".equals(kind) ) {
                         kind = PyEvaluator.expressionVarType(importStatements, assignFrom);
                     }
@@ -238,7 +240,7 @@ public class PySideKickListener extends Python3BaseListener {
                     e.printStackTrace();
                 }
             }
-            completionBuilder.addVar(assignTo, type.toString());
+            completionBuilder.addVar(assignTo, kind);
             SourceAsset variableAsset = new SourceAsset(assignTo + type.toString(), line, begin(line, buffer));
             variablesNode.add(new DefaultMutableTreeNode(variableAsset));
         }

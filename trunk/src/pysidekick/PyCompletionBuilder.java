@@ -11,6 +11,8 @@ public class PyCompletionBuilder {
 
 
     public void addVar(String varName, String type) {
+        if (varName == null || varName.isEmpty() ) return;
+        if (type == null || type.isEmpty() ) return;
         List<String> completions = null;
 
         completions = typeCompletionCache.get(type);
@@ -27,6 +29,7 @@ public class PyCompletionBuilder {
     }
 
     public void addModule(String moduleName) {
+        if (moduleName == null || moduleName.isEmpty() ) return;
         List<String> completions = null;
 
         completions = namespaceToCompletionsCache.get(moduleName);
